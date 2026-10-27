@@ -1,32 +1,72 @@
-name: Daily RCE Australia Scrape
+name: Daily RCE Australia Scrape
+
+# -------------------------------------------------------------------------
+# 1️⃣  Triggers
+# -------------------------------------------------------------------------
 on:
   schedule:
-    - cron: "0 6 * * *"   # 06:00 UTC daily (≈16:00 AEST)
-  workflow_dispatch:      # manual run button
+    # Runs every day at 06:00 UTC (≈ 16:00 AEST)
+    - cron: "0 6 * * *"
+  workflow_dispatch:            # manual “Run workflow” button
+
+# -------------------------------------------------------------------------
+# 2️⃣  Jobs
+# -------------------------------------------------------------------------
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./scraper
+
+    # ---------------------------------------------------------------------
+    # 2.1  Checkout, set up Python
+    # ---------------------------------------------------------------------
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
+        # fetch the full history – needed for a commit later
         with:
-          persist-credentials: false   # we push later with our own token
-      - name: Set up Python
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install deps
-        run: pip install -r requirements.txt
+
+      # -----------------------------------------------------------------
+      # 2.2  Install scraper dependencies
+      # -----------------------------------------------------------------
+      - name: Install deps (requests & beautifulsoup4)
+        run: |
+          python -m pip install --quiet requests beautifulsoup4
+
+      # -----------------------------------------------------------------
+      # 2.3  Run the scraper
+      # -----------------------------------------------------------------
       - name: Run scraper
-        env:
-          BASE_URL: https://www.robotcombatevents.com
-        run: python scraper.py
-      - name: Commit & push if changed
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "🤖 Update AU events (auto‑scrape)"
-          file_pattern: data/events.json
-          # optional: limit to 1 commit per run
+        run: |
+          python scraper/scraper.py
+
+      # -----------------------------------------------------------------
+      # 2.4  Commit the updated events.json (if it changed)
+      # -----------------------------------------------------------------
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Detect changes
+        id: changes
+        run: |
+          git diff --quiet data/events.json || echo "changed=1" >> $GITHUB_OUTPUT
+
+      - name: Commit & push changes
+        if: steps.changes.outputs.changed == '1'
+        run: |
+          git add data/events.json
+          git commit -m "🤖 Update Australian RCE events (auto‑scrape)"
+          git push origin HEAD:${{ github.ref }}
+
+      # -----------------------------------------------------------------
+      # 2.5  (Optional) Invalidate GitHub Pages cache
+      # -----------------------------------------------------------------
+      # If you serve the site from the same branch, GitHub Pages rebuilds
+      # automatically on each push. No extra step is required.
