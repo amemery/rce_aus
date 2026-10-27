@@ -1,0 +1,32 @@
+name: Daily RCE Australia Scrape
+on:
+  schedule:
+    - cron: "0 6 * * *"   # 06:00 UTC daily (≈16:00 AEST)
+  workflow_dispatch:      # manual run button
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./scraper
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # we push later with our own token
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Run scraper
+        env:
+          BASE_URL: https://www.robotcombatevents.com
+        run: python scrape.py
+      - name: Commit & push if changed
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "🤖 Update AU events (auto‑scrape)"
+          file_pattern: data/events.json
+          # optional: limit to 1 commit per run
