@@ -1,23 +1,21 @@
 #!/usr/bin/env python3
 """
-Scrape Robot Combat Events (RCE) for events that match the term “Australia”.
+Scrape Robot Combat Events (RCE) for events that match the term "Australia".
 The script is intended to run daily via a GitHub Action and write the
 filtered results to data/events.json.
 """
 
-import json
-import re
-import sys
+import json, sys, time
 from datetime import datetime
 from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
 
-# --------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------
 # CONFIGURATION
-# --------------------------------------------------------------------------- #
-BASE_URL   = "https://www.robotcombatevents.com"
+# ---------------------------------------------------------------------------
+BASE_URL = "https://www.robotcombatevents.com"
 SEARCH_URL = (
     f"{BASE_URL}/searches?"
     "search%5Bcategory%5D=address&"
@@ -26,32 +24,47 @@ SEARCH_URL = (
     "search%5Bpast_events%5D=0&"
     "commit=Find+Events"
 )
-
 OUTPUT_PATH = Path("data/events.json")   # relative to repo root
 
+# Use a common browser User‑Agent to avoid simple bot blocks
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
-# --------------------------------------------------------------------------- #
-# HELPER: fetch and parse a page
-# --------------------------------------------------------------------------- #
-def fetch_page(url: str) -> BeautifulSoup:
-    """Download ``url`` and return a BeautifulSoup object."""
-    try:
-        r = requests.get(url, timeout=15)
-        r.raise_for_status()
-        return BeautifulSoup(r.text, "html.parser")
-    except Exception as exc:
-        raise RuntimeError(f"Could not fetch {url!r}: {exc}") from exc
+# ---------------------------------------------------------------------------
+# Helper: fetch the raw page text (with simple retry on 403)
+# ---------------------------------------------------------------------------
+def fetch_page_text(url: str, retries: int = 3, backoff: int = 2) -> str:
+    """Return the raw HTML/markdown text of the search page.
 
+    Retries on HTTP 403 (common for bot blocks) with exponential back‑off.
+    """
+    for attempt in range(1, retries + 1):
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=15)
+            r.raise_for_status()
+            return r.text
+        except requests.HTTPError as exc:
+            if r.status_code == 403 and attempt < retries:
+                time.sleep(backoff * attempt)
+                continue
+            raise RuntimeError(f"Could not fetch {url!r}: {exc}")
+        except Exception as exc:
+            raise RuntimeError(f"Could not fetch {url!r}: {exc}")
 
-# --------------------------------------------------------------------------- #
-# HELPER: turn a raw date string into ISO‑8601 (fallback to original)
-# --------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------
+# Helper: turn a raw date string into ISO‑8601 (fallback to original)
+# ---------------------------------------------------------------------------
 def parse_date(raw: str) -> str:
+    """Convert dates like '12/05/2026' to ISO‑8601.
+    If parsing fails we keep the original string.
     """
-    RCE date strings are typically like “12 Sep 2024”.  If parsing fails we
-    keep the original text so the front‑end can still display something.
-    """
-    for fmt in ("%d %b %Y", "%d %B %Y"):
+    for fmt in ("%d/%m/%Y", "%m/%d/%Y"):  # handle both orderings
         try:
             dt = datetime.strptime(raw.strip(), fmt)
             return dt.isoformat()
@@ -59,71 +72,60 @@ def parse_date(raw: str) -> str:
             continue
     return raw.strip()   # fallback
 
-
-# --------------------------------------------------------------------------- #
-# HELPER: extract an event from a single “result” card
-# --------------------------------------------------------------------------- #
-def parse_event(card) -> dict:
-    """
-    The search results use the same markup as the main listing:
-      • .event-title       – event name
-      • a[href]            – link to the event page (relative)
-      • .event-date        – date string
-      • .event-location    – location string
-    Adjust selectors if RCE changes its HTML.
-    """
-    title_el = card.select_one(".event-title")
-    link_el  = card.select_one("a[href]")
-    date_el  = card.select_one(".event-date")
-    loc_el   = card.select_one(".event-location")
-
-    if not (title_el and link_el and date_el):
-        raise ValueError("Missing expected fields in a result card")
-
-    title = title_el.get_text(strip=True)
-    url   = BASE_URL + link_el["href"]
-    date  = parse_date(date_el.get_text())
-    loc   = loc_el.get_text(strip=True) if loc_el else ""
-
-    return {
-        "title": title,
-        "url": url,
-        "date": date,
-        "location": loc,
-        "registered": False   # UI can flip later
-    }
-
-
-# --------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------
 # MAIN SCRAPER LOGIC
-# --------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------
 def scrape():
-    soup = fetch_page(SEARCH_URL)
+    # Get the raw HTML page
+    page_text = fetch_page_text(SEARCH_URL)
+    # NOTE: you can delete the next two lines once you’ve confirmed parsing works
+    # print(f"DEBUG page length: {len(page_text)} characters")
+    # print("DEBUG snippet:", page_text[:500])
 
-    # The results are wrapped in elements with class “event-card”.
-    # If the site uses a different wrapper, change the selector accordingly.
-    cards = soup.select(".event-card")
-    if not cards:
-        raise RuntimeError("No event cards found – selector may be outdated")
+    soup = BeautifulSoup(page_text, "html.parser")
+    rows = soup.select("tr.search-tr")
 
-    events = [parse_event(card) for card in cards]
+    events = []
+    for row in rows:
+        cols = row.select("td")
+        if len(cols) < 3:
+            continue
 
+        raw_date = cols[0].get_text(strip=True)
+
+        link_el = cols[1].select_one("a")
+        if not link_el:
+            continue
+        title = link_el.get_text(strip=True)
+        url = BASE_URL + link_el["href"]
+
+        location = cols[2].get_text(strip=True)
+
+        # Keep only Australian events
+        if "Australia" not in location:
+            continue
+
+        iso_date = parse_date(raw_date)
+        events.append({
+            "title": title,
+            "url": url,
+            "date": iso_date,
+            "location": location,
+            "registered": False,
+        })
     # Sort chronologically (ISO dates sort correctly)
     events.sort(key=lambda e: e["date"])
 
-    # Ensure the output directory exists
+    # Ensure output directory exists and write JSON
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-    # Write pretty‑printed JSON
     with OUTPUT_PATH.open("w", encoding="utf-8") as f:
         json.dump(events, f, indent=2, ensure_ascii=False)
 
     print(f"Wrote {len(events)} Australian events to {OUTPUT_PATH}")
 
-
-# --------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------
 # ENTRY POINT
-# --------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     try:
         scrape()
