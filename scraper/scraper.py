@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 """
-Scrape Robot Combat Events (RCE) for events that match the term "Australia".
-The script is intended to run daily via a GitHub Action and write the
-filtered results to data/events.json.
+Scrape Robot Combat Events (RCE) for Australian events and write them to
+data/events.json. Runs daily via .github/workflows/scrape.yml.
+
+Registration state lives separately in data/registered.json (edited from the
+site's admin mode), so this script never overwrites it.
 """
 
-import json, sys, time
+import json
+import re
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
 
-# ---------------------------------------------------------------------------
-# CONFIGURATION
-# ---------------------------------------------------------------------------
 BASE_URL = "https://www.robotcombatevents.com"
 SEARCH_URL = (
     f"{BASE_URL}/searches?"
@@ -24,9 +26,8 @@ SEARCH_URL = (
     "search%5Bpast_events%5D=0&"
     "commit=Find+Events"
 )
-OUTPUT_PATH = Path("data/events.json")   # relative to repo root
+OUTPUT_PATH = Path("data/events.json")
 
-# Use a common browser User‑Agent to avoid simple bot blocks
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -36,96 +37,78 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
-# ---------------------------------------------------------------------------
-# Helper: fetch the raw page text (with simple retry on 403)
-# ---------------------------------------------------------------------------
-def fetch_page_text(url: str, retries: int = 3, backoff: int = 2) -> str:
-    """Return the raw HTML/markdown text of the search page.
+# Location must look Australian (country name or a state/territory code).
+AU_LOCATION = re.compile(r"\b(Australia|ACT|NSW|NT|QLD|SA|TAS|VIC|WA)\b")
+RETRY_STATUS = {403, 429, 500, 502, 503, 504}
 
-    Retries on HTTP 403 (common for bot blocks) with exponential back‑off.
-    """
+
+def fetch_page_text(url: str, retries: int = 3, backoff: int = 2) -> str:
+    """GET url, retrying on bot-block/5xx statuses and network errors."""
+    last_exc = None
     for attempt in range(1, retries + 1):
         try:
             r = requests.get(url, headers=HEADERS, timeout=15)
-            r.raise_for_status()
-            return r.text
-        except requests.HTTPError as exc:
-            if r.status_code == 403 and attempt < retries:
+            if r.status_code in RETRY_STATUS and attempt < retries:
                 time.sleep(backoff * attempt)
                 continue
-            raise RuntimeError(f"Could not fetch {url!r}: {exc}")
-        except Exception as exc:
-            raise RuntimeError(f"Could not fetch {url!r}: {exc}")
+            r.raise_for_status()
+            return r.text
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            last_exc = exc
+            if attempt < retries:
+                time.sleep(backoff * attempt)
+                continue
+        except requests.HTTPError as exc:
+            last_exc = exc
+            break
+    raise RuntimeError(f"Could not fetch {url!r}: {last_exc}")
 
-# ---------------------------------------------------------------------------
-# Helper: turn a raw date string into ISO‑8601 (fallback to original)
-# ---------------------------------------------------------------------------
+
 def parse_date(raw: str) -> str:
-    """Convert dates like '12/05/2026' to ISO‑8601.
-    If parsing fails we keep the original string.
-    """
-    for fmt in ("%d/%m/%Y", "%m/%d/%Y"):  # handle both orderings
-        try:
-            dt = datetime.strptime(raw.strip(), fmt)
-            return dt.isoformat()
-        except ValueError:
-            continue
-    return raw.strip()   # fallback
+    """RCE is a US site and uses MM/DD/YYYY. Return YYYY-MM-DD (date only,
+    so browsers don't shift it by timezone). Falls back to the raw string."""
+    raw = raw.strip()
+    try:
+        return datetime.strptime(raw, "%m/%d/%Y").date().isoformat()
+    except ValueError:
+        print(f"WARNING: unrecognised date format {raw!r}", file=sys.stderr)
+        return raw
 
-# ---------------------------------------------------------------------------
-# MAIN SCRAPER LOGIC
-# ---------------------------------------------------------------------------
-def scrape():
-    # Get the raw HTML page
-    page_text = fetch_page_text(SEARCH_URL)
-    # NOTE: you can delete the next two lines once you’ve confirmed parsing works
-    # print(f"DEBUG page length: {len(page_text)} characters")
-    # print("DEBUG snippet:", page_text[:500])
 
-    soup = BeautifulSoup(page_text, "html.parser")
-    rows = soup.select("tr.search-tr")
+def scrape() -> None:
+    soup = BeautifulSoup(fetch_page_text(SEARCH_URL), "html.parser")
 
     events = []
-    for row in rows:
+    for row in soup.select("tr.search-tr"):
         cols = row.select("td")
         if len(cols) < 3:
             continue
 
-        raw_date = cols[0].get_text(strip=True)
-
-        link_el = cols[1].select_one("a")
+        link_el = cols[1].select_one("a[href]")
         if not link_el:
             continue
-        title = link_el.get_text(strip=True)
-        url = BASE_URL + link_el["href"]
 
-        location = cols[2].get_text(strip=True)
-
-        # Keep only Australian events
-        if "Australia" not in location:
+        location = cols[2].get_text(" ", strip=True)
+        if not AU_LOCATION.search(location):
             continue
 
-        iso_date = parse_date(raw_date)
         events.append({
-            "title": title,
-            "url": url,
-            "date": iso_date,
+            "title": link_el.get_text(strip=True),
+            "url": requests.compat.urljoin(BASE_URL, link_el["href"]),
+            "date": parse_date(cols[0].get_text(strip=True)),
             "location": location,
-            "registered": False,
         })
-    # Sort chronologically (ISO dates sort correctly)
+
     events.sort(key=lambda e: e["date"])
 
-    # Ensure output directory exists and write JSON
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with OUTPUT_PATH.open("w", encoding="utf-8") as f:
+    with OUTPUT_PATH.open("w", encoding="utf-8", newline="\n") as f:
         json.dump(events, f, indent=2, ensure_ascii=False)
+        f.write("\n")
 
     print(f"Wrote {len(events)} Australian events to {OUTPUT_PATH}")
 
-# ---------------------------------------------------------------------------
-# ENTRY POINT
-# ---------------------------------------------------------------------------
+
 if __name__ == "__main__":
     try:
         scrape()

@@ -1,28 +1,43 @@
-document.addEventListener('DOMContentLoaded', async () => {
-  const resp = await fetch('data/events.json');
-  const events = await resp.json();
+/*  calendar.js – month view of events (FullCalendar v6). */
 
-  const fcEvents = events.map(ev => ({
+document.addEventListener("DOMContentLoaded", async () => {
+  const calendarEl = document.getElementById("calendar");
+  if (typeof FullCalendar === "undefined") {
+    console.error("FullCalendar failed to load");
+    calendarEl.hidden = true;
+    return;
+  }
+
+  let data;
+  try {
+    data = await RCE.load();
+  } catch (e) {
+    console.error(e);   // list.js shows the message
+    return;
+  }
+
+  const toFcEvents = () => data.events.map(ev => ({
+    id: ev.url,
     title: ev.title,
     start: ev.date,
+    allDay: true,
     url: ev.url,
-    extendedProps: { registered: ev.registered }
+    classNames: RCE.isRegistered(ev.url) ? ["is-registered"] : [],
   }));
 
-  const calendarEl = document.getElementById('calendar');
   const calendar = new FullCalendar.Calendar(calendarEl, {
-    initialView: 'dayGridMonth',
-    events: fcEvents,
+    initialView: "dayGridMonth",
+    firstDay: 1,
+    events: toFcEvents(),
     eventClick: info => {
-      // open RCE page in new tab
-      window.open(info.event.url, '_blank');
       info.jsEvent.preventDefault();
+      window.open(info.event.url, "_blank", "noopener");
     },
-    eventDidMount: info => {
-      const reg = info.event.extendedProps.registered ? "✅" : "❌";
-      const el = info.el;
-      el.insertAdjacentHTML('beforeend', `<span class="reg-status">${reg}</span>`);
-    }
   });
   calendar.render();
+
+  document.addEventListener("rce:registered-changed", () => {
+    calendar.removeAllEvents();
+    calendar.addEventSource(toFcEvents());
+  });
 });

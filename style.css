@@ -1,7 +1,24 @@
-body {font-family:Arial,Helvetica,sans-serif; margin:2rem;}
+body {font-family:Arial,Helvetica,sans-serif; margin:2rem; color:#222;}
 h1, h2 {color:#2b5d20;}
 #calendar {max-width:900px; margin:auto;}
-#event-list {list-style:none; padding:0;}
-#event-list li {margin:0.5rem 0; padding:0.5rem; border:1px solid #ddd;}
-.reg-status {margin-left:0.5rem; font-weight:bold;}
-.reg-btn {margin-left:1rem; cursor:pointer;}
+
+.banner {padding:0.5rem 0.75rem; border-radius:4px; background:#eef5ea; max-width:900px; margin:1rem auto;}
+.banner.error {background:#fdecea; color:#8a1f11;}
+
+#event-list {list-style:none; padding:0; max-width:900px; margin:auto;}
+#event-list li {display:flex; flex-wrap:wrap; gap:0.25rem 1rem; align-items:center;
+                margin:0.5rem 0; padding:0.5rem 0.75rem; border:1px solid #ddd; border-radius:4px;}
+#event-list li.is-registered {border-color:#2b5d20; background:#f4f9f2;}
+#event-list .title {flex:1 1 100%; font-weight:bold;}
+#event-list .date {color:#555;}
+#event-list .loc {color:#555; flex:1;}
+.reg-status {font-weight:bold; color:#2b5d20;}
+.reg-btn {cursor:pointer;}
+button.reg-btn:disabled {cursor:wait;}
+
+/* calendar tick for registered events */
+.fc .fc-event.is-registered {background:#2b5d20; border-color:#2b5d20;}
+.fc .is-registered .fc-event-title::before {content:"✅ ";}
+
+footer {margin-top:2rem; text-align:center; font-size:0.85rem; color:#777;}
+@media (max-width:600px) { body {margin:1rem;} }

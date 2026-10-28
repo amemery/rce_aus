@@ -1,92 +1,52 @@
 name: Daily RCE Australia Scrape
 
-# -------------------------------------------------
-# 1️⃣  Permissions – allow the job to write to the repo
-# -------------------------------------------------
+# GITHUB_TOKEN with contents:write is enough to push events.json; no PAT needed.
+# (Pushes from GITHUB_TOKEN don't trigger other workflows – if you later add one
+# that must run on this push, add `token: ${{ secrets.PAT_TOKEN }}` to checkout.)
 permissions:
-  contents: write      # needed for git push
-  # (add other scopes if you need them, e.g. pages: write)
+  contents: write
 
-# -------------------------------------------------
-# 2️⃣  Triggers
-# -------------------------------------------------
 on:
   schedule:
-    - cron: "0 6 * * *"          # daily at 06:00 UTC (≈ 16:00 AEST)
-  workflow_dispatch:             # manual run button
+    - cron: "0 20 * * *"         # 20:00 UTC = 06:00 Brisbane
+  workflow_dispatch:
 
-# -------------------------------------------------
-# 3️⃣  Job
-# -------------------------------------------------
+concurrency:
+  group: scrape
+  cancel-in-progress: false
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
-
     steps:
-      # -------------------------------------------------
-      # 3.1  Checkout the branch that GitHub Pages serves from
-      # -------------------------------------------------
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          persist-credentials: true
-          # Adjust if your Pages site is published from `main` instead of `gh-pages`
           ref: main
 
-      # -------------------------------------------------
-      # 3.2  Set up Python
-      # -------------------------------------------------
-      - name: Set up Python 3.12
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scraper/requirements.txt
 
-      # -------------------------------------------------
-      # 3.3  Install scraper dependencies
-      # -------------------------------------------------
       - name: Install dependencies
-        run: |
-          python -m pip install --quiet requests beautifulsoup4
+        run: python -m pip install --quiet -r scraper/requirements.txt
 
-      # -------------------------------------------------
-      # 3.4  Run the scraper (creates/updates data/events.json)
-      # -------------------------------------------------
       - name: Run scraper
-        run: |
-          python scraper/scraper.py
+        run: python scraper/scraper.py
 
-      # -------------------------------------------------
-      # 3.5  Configure Git user (uses the GITHUB_TOKEN automatically)
-      # -------------------------------------------------
-      - name: Configure Git user
+      - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      # -------------------------------------------------
-      # 3.6  Stage the new/changed JSON file
-      # -------------------------------------------------
-      - name: Stage events.json
-        run: |
           git add data/events.json
-
-      # -------------------------------------------------
-      # 3.7  Commit only if there are changes
-      # -------------------------------------------------
-      - name: Commit changes
-        id: commit
-        run: |
           if git diff --cached --quiet; then
-            echo "no_changes=true" >> $GITHUB_OUTPUT
-          else
-            git commit -m "🤖 Update Australian RCE events (auto‑scrape)"
-            echo "no_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes."
+            exit 0
           fi
-
-      # -------------------------------------------------
-      # 3.8  Push back to the publishing branch
-      # -------------------------------------------------
-      - name: Push changes
-        if: steps.commit.outputs.no_changes == 'false'
-        run: |
-          git push origin HEAD:${{ github.ref }}
+          git commit -m "🤖 Update Australian RCE events (auto-scrape)"
+          # registered.json may have been committed from the site meanwhile
+          git pull --rebase origin main
+          git push origin HEAD:main

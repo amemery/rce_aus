@@ -1,140 +1,73 @@
-/*  list.js – renders a simple list of events from data/events.json
- *  and lets you toggle a “registered” flag for each event.
- *
- *  Two modes:
- *  1️⃣  Local‑only: the flag lives in the browser (localStorage) – no GitHub write.
- *  2️⃣  Git‑backed: if the user supplies a GitHub Personal Access Token (PAT)
- *      the script writes the updated JSON back to the repo via the GitHub
- *      Contents API.  The token is stored in localStorage (never sent to a
- *      server you control).
- *
- *  Adjust `REPO_OWNER` and `REPO_NAME` to match your GitHub repository.
+/*  list.js – renders the event list. In admin mode (?admin) each event gets a
+ *  toggle that records whether you've registered; see data.js.
  */
 
-const REPO_OWNER = "amemery";   // ← replace
-const REPO_NAME  = "rce_aus";              // ← replace
-
-// ---------------------------------------------------------------------------
-// Helper: fetch the JSON file from the static site
-async function loadEvents() {
-  const resp = await fetch("data/events.json");
-  if (!resp.ok) throw new Error(`Failed to load events.json (${resp.status})`);
-  return resp.json();   // array of event objects
-}
-
-// ---------------------------------------------------------------------------
-// Helper: write the whole JSON file back to GitHub (optional persistence)
-async function pushEventsToGitHub(updatedEvents) {
-  const token = localStorage.getItem("gh_pat");
-  if (!token) return;                     // no token → skip GitHub write
-
-  const apiBase = "https://api.github.com";
-  const path = "data/events.json";
-
-  // 1️⃣ Get the current file metadata (SHA & base64 content)
-  const metaResp = await fetch(
-    `${apiBase}/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`,
-    {
-      headers: { Authorization: *** ${token}` }   // ← fixed
-    }
-  );
-  if (!metaResp.ok) {
-    console.warn("GitHub metadata fetch failed – skipping persistence");
-    return;
-  }
-  const meta = await metaResp.json();   // contains sha, content (base64)
-
-  // 2️⃣ Prepare the new content (base64‑encoded)
-const newContent = btoa(JSON.stringify(updatedEvents, null, 2));
-
-  // 3️⃣ Commit the change
-  const commitResp = await fetch(
-    `${apiBase}/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: *** ${token}`,           // ← fixed
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message: "Update registration flag (auto‑commit)",
-        content: newContent,
-        sha: meta.sha
-      })
-    }
-  );
-
-  if (!commitResp.ok) {
-    console.warn("GitHub commit failed", await commitResp.text());
-  }
-}
-
-// ---------------------------------------------------------------------------
-// UI rendering
 document.addEventListener("DOMContentLoaded", async () => {
-  let events;
+  const listEl   = document.getElementById("event-list");
+  const statusEl = document.getElementById("status");
+  const showError = msg => { statusEl.textContent = msg; statusEl.hidden = false; };
+
+  if (RCE.isAdmin) document.getElementById("admin-banner").hidden = false;
+
+  let data;
   try {
-    events = await loadEvents();
+    data = await RCE.load();
   } catch (e) {
     console.error(e);
+    showError(e.message);
     return;
   }
 
-  const listEl = document.getElementById("event-list");
-  if (!listEl) {
-    console.error("Missing <ul id=\"event-list\"> in index.html");
-    return;
-  }
-
-  const render = () => {
-    // clear any previous items
-    listEl.innerHTML = "";
-
-    events.forEach((ev, idx) => {
-      const li = document.createElement("li");
-      li.dataset.idx = idx;   // store index for later lookup
-
-      // Build the list entry HTML
-      li.innerHTML = `
-        <a href="${ev.url}" target="_blank">${ev.title}</a>
-        <span class="date">${new Date(ev.date).toLocaleDateString()}</span>
-        <span class="loc">${ev.location || ""}</span>
-        <button class="reg-btn">${ev.registered ? "Registered ✅" : "Register"}</button>
-     `;
-
-      const btn = li.querySelector(".reg-btn");
-      btn.addEventListener("click", async () => {
-        // toggle flag in the in‑memory array
-        ev.registered = !ev.registered;
-        // update button text immediately
-        btn.textContent = ev.registered ? "Registered ✅" : "Register";
-
-        // Persist the change (if a PAT is present)
-        await pushEventsToGitHub(events);
-      });
-
-      listEl.appendChild(li);
-    });
+  const el = (tag, props = {}, text) => {
+    const n = Object.assign(document.createElement(tag), props);
+    if (text !== undefined) n.textContent = text;
+    return n;
   };
 
-  // -------------------------------------------------------------------------
-  // Optional: Prompt for a GitHub PAT if the user wants persistence
-  // (Only shown once per browser via localStorage)
-  if (!localStorage.getItem("gh_pat")) {
-    const wantPersist = confirm(
-      "Do you want your registration choices to be saved across devices?\n" +
-      "If you answer Yes, you'll be asked for a GitHub Personal Access Token " +
-      "with the 'repo' scope. The token is stored only in this browser."
-    );
-    if (wantPersist) {
-      const pat = prompt("Enter your GitHub PAT (repo scope):");
-      if (pat) {
-        localStorage.setItem("gh_pat", pat.trim());
-        alert("Token saved – future changes will be committed to the repo.");
-      }
-    }
-  }
+  const render = () => {
+    listEl.replaceChildren();
 
-  // Initial render
+    if (!data.events.length) {
+      listEl.append(el("li", { className: "empty" }, "No upcoming Australian events."));
+      return;
+    }
+
+    for (const ev of data.events) {
+      const registered = RCE.isRegistered(ev.url);
+      const li = el("li", { className: registered ? "is-registered" : "" });
+
+      li.append(
+        el("a", { href: ev.url, target: "_blank", rel: "noopener", className: "title" }, ev.title),
+        el("span", { className: "date" }, RCE.formatDate(ev.date)),
+        el("span", { className: "loc" }, ev.location || ""),
+      );
+
+      if (RCE.isAdmin) {
+        const btn = el("button", { className: "reg-btn", type: "button" },
+          registered ? "Registered ✅" : "Mark registered");
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          btn.textContent = "Saving…";
+          statusEl.hidden = true;
+          try {
+            await RCE.setRegistered(ev.url, !registered);   // fires rce:registered-changed → re-render
+          } catch (e) {
+            console.error(e);
+            showError(e.message);
+            render();
+          }
+        });
+        li.append(btn);
+      } else {
+        li.append(registered
+          ? el("span", { className: "reg-status" }, "Registered ✅")
+          : el("a", { href: ev.url, target: "_blank", rel: "noopener", className: "reg-btn" }, "Register on RCE ↗"));
+      }
+
+      listEl.append(li);
+    }
+  };
+
+  document.addEventListener("rce:registered-changed", render);
   render();
 });
