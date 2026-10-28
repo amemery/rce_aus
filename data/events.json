@@ -1,23 +1,38 @@
 [
   {
-    "title": "Canberra Combat Robotics - December 2026",
-    "url": "https://www.robotcombatevents.com/events/10693",
-    "date": "2026-05-12T00:00:00",
-    "location": "Fyshwick, ACT, Australia",
-    "registered": false
+    "title": "Rumble in Redmond - 2026",
+    "url": "https://www.robotcombatevents.com/events/10718",
+    "date": "2026-11-21",
+    "location": "Redmond, WA, United States"
   },
   {
     "title": "Australian Robowars Nationals 2026",
     "url": "https://www.robotcombatevents.com/events/10025",
-    "date": "2026-11-28T00:00:00",
-    "location": "Northgate, QLD, Australia",
-    "registered": false
+    "date": "2026-11-28",
+    "location": "Northgate, QLD, Australia"
   },
   {
     "title": "Hunter Combat Robotics: Round 5",
     "url": "https://www.robotcombatevents.com/events/10619",
-    "date": "2026-11-28T00:00:00",
-    "location": "Windale, NSW, Australia",
-    "registered": false
+    "date": "2026-11-28",
+    "location": "Windale, NSW, Australia"
+  },
+  {
+    "title": "Canberra Combat Robotics - December 2026",
+    "url": "https://www.robotcombatevents.com/events/10693",
+    "date": "2026-12-05",
+    "location": "Fyshwick, ACT, Australia"
+  },
+  {
+    "title": "Crimson Bot Brawl - Fall 2026",
+    "url": "https://www.robotcombatevents.com/events/10091",
+    "date": "2026-12-05",
+    "location": "Pullman, WA, United States"
+  },
+  {
+    "title": "Olympia Tournament & Joust",
+    "url": "https://www.robotcombatevents.com/events/10690",
+    "date": "2027-02-20",
+    "location": "Olympia, WA, United States"
   }
 ]
