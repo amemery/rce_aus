@@ -8,7 +8,6 @@ on GitHub), so this script never overwrites it.
 """
 
 import json
-import re
 import sys
 import time
 from datetime import datetime
@@ -37,8 +36,12 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
-# Location must look Australian (country name or a state/territory code).
-AU_LOCATION = re.compile(r"\b(Australia|ACT|NSW|NT|QLD|SA|TAS|VIC|WA)\b")
+
+def is_australian(location: str) -> bool:
+    """RCE locations look like 'Northgate, QLD, Australia' – check the country part."""
+    return location.rsplit(",", 1)[-1].strip().lower() == "australia"
+
+
 RETRY_STATUS = {403, 429, 500, 502, 503, 504}
 
 
@@ -89,7 +92,7 @@ def scrape() -> None:
             continue
 
         location = cols[2].get_text(" ", strip=True)
-        if not AU_LOCATION.search(location):
+        if not is_australian(location):
             continue
 
         events.append({

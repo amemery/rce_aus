@@ -9,7 +9,7 @@ const RCE = (() => {
   async function fetchJson(path, fallback) {
     const resp = await fetch(path, { cache: "no-cache" });
     if (resp.status === 404 && fallback !== undefined) return fallback;
-    if (!resp.ok) throw new Error(`Failed to load ${path} (${resp.status})`);
+    if (!resp.ok) throw new Error(`Couldn't load ${path} (HTTP ${resp.status}). Try reloading the page.`);
     return resp.json();
   }
 
@@ -30,14 +30,18 @@ const RCE = (() => {
 
   const isRegistered = url => registered.has(url);
 
-  // "2026-11-28" -> local date, no timezone shift.
-  function formatDate(iso) {
-    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
-    if (!m) return iso;
-    return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString("en-AU", {
-      weekday: "short", day: "numeric", month: "short", year: "numeric",
-    });
+  // "2026-11-28" -> local Date at midnight (no timezone shift), or null.
+  function parseDate(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
   }
 
-  return { load, isRegistered, formatDate };
+  // "Northgate, QLD, Australia" -> { place: "Northgate", state: "QLD" }
+  function splitLocation(location = "") {
+    const parts = location.split(",").map(s => s.trim()).filter(Boolean);
+    if (parts.length >= 3) return { place: parts.slice(0, -2).join(", "), state: parts.at(-2) };
+    return { place: parts[0] || "", state: "" };
+  }
+
+  return { load, isRegistered, parseDate, splitLocation };
 })();

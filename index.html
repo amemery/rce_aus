@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Australian RCE Events</title>
+  <title>Australian Robot Combat Events</title>
+  <meta name="description" content="Upcoming robot combat events in Australia, from robotcombatevents.com.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <!-- FullCalendar v6 injects its own CSS; there is no separate stylesheet. -->
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js" defer></script>
@@ -12,15 +16,29 @@
   <script src="list.js" defer></script>
 </head>
 <body>
-  <h1>🇦🇺 Australian Robot Combat Events</h1>
+  <div class="page">
+    <header class="site-header">
+      <h1>Robot combat in Australia</h1>
+      <p class="lede">Upcoming events listed on Robot Combat Events. Open one to see the details and register.</p>
+    </header>
 
-  <p id="status" class="banner error" role="alert" hidden></p>
+    <p id="status" class="status" role="alert" hidden></p>
 
-  <section id="calendar"></section>
+    <section id="next-up" class="next-up" aria-label="Next event" hidden></section>
 
-  <h2>Event List</h2>
-  <ul id="event-list"></ul>
+    <section class="events" aria-labelledby="events-heading">
+      <h2 id="events-heading">All events</h2>
+      <div id="event-list"></div>
+    </section>
 
-  <footer>Data from <a href="https://www.robotcombatevents.com" target="_blank" rel="noopener">robotcombatevents.com</a>, refreshed daily.</footer>
+    <section class="calendar-section" aria-labelledby="calendar-heading">
+      <h2 id="calendar-heading">Calendar</h2>
+      <div id="calendar"></div>
+    </section>
+
+    <footer class="site-footer">
+      Event data from <a href="https://www.robotcombatevents.com" target="_blank" rel="noopener">robotcombatevents.com</a>, refreshed daily.
+    </footer>
+  </div>
 </body>
 </html>
