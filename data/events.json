@@ -1,11 +1,5 @@
 [
   {
-    "title": "Rumble in Redmond - 2026",
-    "url": "https://www.robotcombatevents.com/events/10718",
-    "date": "2026-11-21",
-    "location": "Redmond, WA, United States"
-  },
-  {
     "title": "Australian Robowars Nationals 2026",
     "url": "https://www.robotcombatevents.com/events/10025",
     "date": "2026-11-28",
@@ -22,17 +16,5 @@
     "url": "https://www.robotcombatevents.com/events/10693",
     "date": "2026-12-05",
     "location": "Fyshwick, ACT, Australia"
-  },
-  {
-    "title": "Crimson Bot Brawl - Fall 2026",
-    "url": "https://www.robotcombatevents.com/events/10091",
-    "date": "2026-12-05",
-    "location": "Pullman, WA, United States"
-  },
-  {
-    "title": "Olympia Tournament & Joust",
-    "url": "https://www.robotcombatevents.com/events/10690",
-    "date": "2027-02-20",
-    "location": "Olympia, WA, United States"
   }
 ]
