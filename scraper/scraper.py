@@ -3,8 +3,8 @@
 Scrape Robot Combat Events (RCE) for Australian events and write them to
 data/events.json. Runs daily via .github/workflows/scrape.yml.
 
-Registration state lives separately in data/registered.json (edited from the
-site's admin mode), so this script never overwrites it.
+Registration state lives separately in data/registered.json (edited by hand
+on GitHub), so this script never overwrites it.
 """
 
 import json

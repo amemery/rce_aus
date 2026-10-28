@@ -13,8 +13,6 @@ h1, h2 {color:#2b5d20;}
 #event-list .date {color:#555;}
 #event-list .loc {color:#555; flex:1;}
 .reg-status {font-weight:bold; color:#2b5d20;}
-.reg-btn {cursor:pointer;}
-button.reg-btn:disabled {cursor:wait;}
 
 /* calendar tick for registered events */
 .fc .fc-event.is-registered {background:#2b5d20; border-color:#2b5d20;}

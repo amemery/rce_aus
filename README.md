@@ -10,9 +10,13 @@ Australian events from [Robot Combat Events](https://www.robotcombatevents.com),
 
 ## Tracking registrations
 
-Open the site with `?admin` (e.g. `https://amemery.github.io/rce_aus/?admin`). On first use you'll be asked for a GitHub **fine-grained PAT** limited to this repo with **Contents: Read and write**. It's stored in that browser's localStorage only. Toggling an event commits `data/registered.json`. Use `?admin=logout` to forget the token.
+Edit `data/registered.json` on GitHub and add the RCE URL of each event you've registered for, e.g.
 
-Repo/environment secrets can't be used for this – they're only available inside Actions runs, not in the browser.
+```json
+["https://www.robotcombatevents.com/events/10025"]
+```
+
+Those events show as registered in the list and calendar.
 
 ## Running the scraper locally
 

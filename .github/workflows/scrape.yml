@@ -1,8 +1,6 @@
 name: Daily RCE Australia Scrape
 
-# GITHUB_TOKEN with contents:write is enough to push events.json; no PAT needed.
-# (Pushes from GITHUB_TOKEN don't trigger other workflows – if you later add one
-# that must run on this push, add `token: ${{ secrets.PAT_TOKEN }}` to checkout.)
+# The built-in GITHUB_TOKEN with contents:write is enough to push events.json.
 permissions:
   contents: write
 
