@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           # keep the auth token so we can push later
-          persist-credentials: ***
+          persist-credentials: true
           # use the branch that GitHub Pages serves from
           # (change to `main` if your site is published from the default branch)
           ref: main               # <-- adjust if you publish from another branch
