@@ -1,16 +1,22 @@
 name: Daily RCE Australia Scrape
 
 # -------------------------------------------------
-# 1️⃣  Triggers
+# 1️⃣  Permissions – allow the job to write to the repo
+# -------------------------------------------------
+permissions:
+  contents: write      # needed for git push
+  # (add other scopes if you need them, e.g. pages: write)
+
+# -------------------------------------------------
+# 2️⃣  Triggers
 # -------------------------------------------------
 on:
   schedule:
-    # every day at 06:00 UTC (≈ 16:00 AEST)
-    - cron: "0 6 * * *"
-  workflow_dispatch:                # manual run button
+    - cron: "0 6 * * *"          # daily at 06:00 UTC (≈ 16:00 AEST)
+  workflow_dispatch:             # manual run button
 
 # -------------------------------------------------
-# 2️⃣  Job
+# 3️⃣  Job
 # -------------------------------------------------
 jobs:
   scrape:
@@ -18,19 +24,17 @@ jobs:
 
     steps:
       # -------------------------------------------------
-      # 2.1  Checkout – ensure we have a real branch
+      # 3.1  Checkout the branch that GitHub Pages serves from
       # -------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # keep the auth token so we can push later
           persist-credentials: true
-          # use the branch that GitHub Pages serves from
-          # (change to `main` if your site is published from the default branch)
-          ref: main               # <-- adjust if you publish from another branch
+          # Adjust if your Pages site is published from `main` instead of `gh-pages`
+          ref: main
 
       # -------------------------------------------------
-      # 2.2  Set up Python 3.12
+      # 3.2  Set up Python
       # -------------------------------------------------
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -38,21 +42,21 @@ jobs:
           python-version: "3.12"
 
       # -------------------------------------------------
-      # 2.3  Install scraper dependencies
+      # 3.3  Install scraper dependencies
       # -------------------------------------------------
       - name: Install dependencies
         run: |
           python -m pip install --quiet requests beautifulsoup4
 
       # -------------------------------------------------
-      # 2.4  Run the scraper (creates/updates data/events.json)
+      # 3.4  Run the scraper (creates/updates data/events.json)
       # -------------------------------------------------
       - name: Run scraper
         run: |
           python scraper/scraper.py
 
       # -------------------------------------------------
-      # 2.5  Configure Git user (uses the default GITHUB_TOKEN)
+      # 3.5  Configure Git user (uses the GITHUB_TOKEN automatically)
       # -------------------------------------------------
       - name: Configure Git user
         run: |
@@ -60,14 +64,14 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       # -------------------------------------------------
-      # 2.6  Stage the new/changed JSON file
+      # 3.6  Stage the new/changed JSON file
       # -------------------------------------------------
       - name: Stage events.json
         run: |
           git add data/events.json
 
       # -------------------------------------------------
-      # 2.7  Commit only if there are changes
+      # 3.7  Commit only if there are changes
       # -------------------------------------------------
       - name: Commit changes
         id: commit
@@ -76,11 +80,11 @@ jobs:
             echo "no_changes=true" >> $GITHUB_OUTPUT
           else
             git commit -m "🤖 Update Australian RCE events (auto‑scrape)"
-          echo "no_changes=false" >> $GITHUB_OUTPUT
+            echo "no_changes=false" >> $GITHUB_OUTPUT
           fi
 
       # -------------------------------------------------
-      # 2.8  Push back to the publishing branch
+      # 3.8  Push back to the publishing branch
       # -------------------------------------------------
       - name: Push changes
         if: steps.commit.outputs.no_changes == 'false'
