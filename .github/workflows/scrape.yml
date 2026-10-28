@@ -1,4 +1,4 @@
-name: Daily RCE Australia Scrape
+name: Daily RCE Australia Scrape
 
 # -------------------------------------------------
 # 1️⃣  Triggers
@@ -16,21 +16,21 @@ jobs:
   scrape:
     runs-on: ubuntu-latest
 
-    # -------------------------------------------------
-    # 2.1  Checkout – make sure we have a real branch
-    # -------------------------------------------------
     steps:
+      # -------------------------------------------------
+      # 2.1  Checkout – ensure we have a real branch
+      # -------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           # keep the auth token so we can push later
           persist-credentials: ***
           # use the branch that GitHub Pages serves from
-          # change this to `main` if your site is published from the default branch
+          # (change to `main` if your site is published from the default branch)
           ref: main               # <-- adjust if you publish from another branch
 
       # -------------------------------------------------
-      # 2.2  Set up Python
+      # 2.2  Set up Python 3.12
       # -------------------------------------------------
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -52,7 +52,7 @@ jobs:
           python scraper/scraper.py
 
       # -------------------------------------------------
-      # 2.5  Configure Git (the GITHUB_TOKEN is already present)
+      # 2.5  Configure Git user (uses the default GITHUB_TOKEN)
       # -------------------------------------------------
       - name: Configure Git user
         run: |
